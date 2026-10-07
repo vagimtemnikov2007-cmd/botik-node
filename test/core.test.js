@@ -30,6 +30,17 @@ test('config rejects unsafe limits and missing webhook secrets', () => {
   assert.throws(() => loadConfig({ ...env, ALLOWED_USERS: '123,nope' }));
   assert.throws(() => loadConfig({ ...env, CONCURRENCY: '0' }));
 });
+test('Render configuration uses environment only and ignores computer-specific paths', () => {
+  const config = loadConfig({ BOT_TOKEN: '123:fake', RENDER_EXTERNAL_URL: 'https://botik-test.onrender.com', WEBHOOK_SECRET: 'a'.repeat(32),
+    PORT: '10000', YTDLP_PATH: '/missing/local/yt-dlp', FFMPEG_PATH: '/missing/ffmpeg', COOKIES_FILE: '/missing/cookies.txt' });
+  assert.equal(config.webhookUrl, 'https://botik-test.onrender.com');
+  assert.equal(config.port, 10000);
+  assert.equal(config.ytdlp, 'yt-dlp');
+  assert.equal(config.ffmpeg, 'ffmpeg');
+  assert.equal(config.cookiesText, '');
+  assert.throws(() => loadConfig({ BOT_TOKEN: '123:fake', RENDER_EXTERNAL_URL: 'https://botik-test.onrender.com' }), /WEBHOOK_SECRET/);
+  assert.equal(loadConfig({ BOT_TOKEN: '123:fake', RENDER_EXTERNAL_URL: 'https://botik-test.onrender.com', WEBHOOK_URL: 'https://custom.example', WEBHOOK_SECRET: 'a'.repeat(32) }).webhookUrl, 'https://custom.example');
+});
 test('queue enforces concurrency, capacity and cancellation per owner', async () => {
   const queue = new JobQueue(1, 3);
   let running = 0, peak = 0, queuedRan = false;

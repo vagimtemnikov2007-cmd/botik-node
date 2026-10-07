@@ -1,5 +1,3 @@
-import { resolve } from 'node:path';
-
 export function loadConfig(env = process.env) {
   const number = (key, fallback, min, max) => {
     const value = Number(env[key] || fallback);
@@ -7,8 +5,8 @@ export function loadConfig(env = process.env) {
     return value;
   };
   const token = env.BOT_TOKEN;
-  if (!token || !/^\d+:[\w-]+$/.test(token)) throw new Error('Укажите BOT_TOKEN в .env');
-  const webhookUrl = env.WEBHOOK_URL || '';
+  if (!token || !/^\d+:[\w-]+$/.test(token)) throw new Error('Укажите переменную окружения BOT_TOKEN');
+  const webhookUrl = env.WEBHOOK_URL || env.RENDER_EXTERNAL_URL || '';
   const webhookSecret = env.WEBHOOK_SECRET || '';
   if (webhookUrl && (new URL(webhookUrl).protocol !== 'https:' || !/^[\w-]{16,256}$/.test(webhookSecret))) {
     throw new Error('Webhook требует HTTPS URL и WEBHOOK_SECRET длиной 16..256 символов');
@@ -17,6 +15,10 @@ export function loadConfig(env = process.env) {
   if (!['360', '720', '1080'].includes(quality)) throw new Error('DEFAULT_QUALITY: 360, 720 или 1080');
   const allowedUsers = (env.ALLOWED_USERS || '').split(',').map(s => s.trim()).filter(Boolean);
   if (allowedUsers.some(id => !/^\d+$/.test(id))) throw new Error('ALLOWED_USERS должен содержать числовые ID');
+  const cookiesText = env.COOKIES_TEXT || '';
+  if (cookiesText && (!/^# (?:Netscape )?HTTP Cookie File/.test(cookiesText) || Buffer.byteLength(cookiesText) > 1024 * 1024)) {
+    throw new Error('COOKIES_TEXT должен содержать cookies в формате Netscape размером до 1 МиБ');
+  }
   return {
     token, webhookUrl, webhookSecret, quality, allowedUsers: new Set(allowedUsers),
     port: number('PORT', 8000, 1, 65535), concurrency: number('CONCURRENCY', 2, 1, 8),
@@ -25,7 +27,7 @@ export function loadConfig(env = process.env) {
     maxDuration: number('MAX_DURATION_SECONDS', 1800, 1, 14400),
     timeoutMs: number('JOB_TIMEOUT_SECONDS', 300, 10, 1800) * 1000,
     maxLinks: number('MAX_LINKS', 3, 1, 10), maxItems: number('MAX_ITEMS', 10, 1, 20),
-    ytdlp: env.YTDLP_PATH || 'yt-dlp', ffmpeg: env.FFMPEG_PATH || 'ffmpeg', ffprobe: env.FFPROBE_PATH || 'ffprobe',
-    cookies: env.COOKIES_FILE ? resolve(env.COOKIES_FILE) : '', logLevel: env.LOG_LEVEL || 'info',
+    ytdlp: 'yt-dlp', ffmpeg: 'ffmpeg', ffprobe: 'ffprobe',
+    cookiesText, logLevel: env.LOG_LEVEL || 'info',
   };
 }

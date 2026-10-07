@@ -5,12 +5,12 @@
   "type": "module",
   "engines": { "node": ">=22.9" },
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/index.js",
-    "dev": "node --watch --env-file-if-exists=.env src/index.js",
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
     "test": "node --test",
     "check": "node --check src/index.js && node --test",
-    "doctor": "node --env-file-if-exists=.env src/doctor.js",
-    "smoke": "node --env-file-if-exists=.env scripts/smoke.js"
+    "doctor": "node src/doctor.js",
+    "smoke": "node scripts/smoke.js"
   },
   "dependencies": { "grammy": "^1.38.0", "pino": "^9.9.0", "ipaddr.js": "^2.2.0" }
 }

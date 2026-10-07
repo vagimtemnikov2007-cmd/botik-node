@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, stat, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, writeFile, stat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runProcess } from './process.js';
@@ -20,10 +20,16 @@ export function ogValue(html, property) {
 
 export class MediaService {
   constructor(config, logger) { this.config = config; this.logger = logger; }
-  commonArgs() {
+  commonArgs(cookiePath = '') {
     const c = this.config;
     return ['--ignore-config', '--no-warnings', '--no-playlist', '--socket-timeout', '20', '--retries', '2', '--fragment-retries', '2',
-      ...(c.ffmpeg === 'ffmpeg' ? [] : ['--ffmpeg-location', c.ffmpeg]), '--js-runtimes', 'node', ...(c.cookies ? ['--cookies', c.cookies] : [])];
+      ...(c.ffmpeg === 'ffmpeg' ? [] : ['--ffmpeg-location', c.ffmpeg]), '--js-runtimes', 'node', ...(cookiePath ? ['--cookies', cookiePath] : [])];
+  }
+  async downloadArgs(dir) {
+    if (!this.config.cookiesText) return this.commonArgs();
+    const cookiePath = join(dir, 'cookies.txt');
+    await writeFile(cookiePath, this.config.cookiesText, { mode: 0o600, flag: 'wx' });
+    return this.commonArgs(cookiePath);
   }
   async download(link, { quality, audio = false, signal }) {
     const dir = await mkdtemp(join(tmpdir(), 'botik-node-'));
@@ -83,8 +89,9 @@ export class MediaService {
   }
   async ytdlp(link, dir, quality, audio, signal) {
     const c = this.config;
+    const downloadArgs = await this.downloadArgs(dir);
     const target = link.platform === 'music' ? `ytsearch1:${link.query}` : link.url;
-    const raw = await runProcess(c.ytdlp, [...this.commonArgs(), '--dump-single-json', '--skip-download', '--playlist-end', String(c.maxItems), '--', target], { signal, timeoutMs: c.timeoutMs });
+    const raw = await runProcess(c.ytdlp, [...downloadArgs, '--dump-single-json', '--skip-download', '--playlist-end', String(c.maxItems), '--', target], { signal, timeoutMs: c.timeoutMs });
     const info = JSON.parse(raw);
     const entries = info.entries ? info.entries.filter(Boolean).slice(0, c.maxItems) : [info];
     if (!entries.length) throw new Error('Медиа не найдено.');
@@ -106,7 +113,7 @@ export class MediaService {
       finally { checking = false; }
     }, 1000);
     try {
-      await runProcess(c.ytdlp, [...this.commonArgs(), '--playlist-end', String(c.maxItems), '--max-filesize', String(c.maxBytes * 3),
+      await runProcess(c.ytdlp, [...downloadArgs, '--playlist-end', String(c.maxItems), '--max-filesize', String(c.maxBytes * 3),
         '--match-filter', `!is_live & duration <=? ${c.maxDuration}`, '--write-info-json', '-o', join(dir, '%(autonumber)03d-%(id)s.%(ext)s'),
         ...format, '--', target], { signal: AbortSignal.any([signal, diskController.signal]), timeoutMs: c.timeoutMs });
     } finally { clearInterval(diskTimer); }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, stat, writeFile, access } from 'node:fs/promises';
+import { mkdtemp, rm, stat, writeFile, readFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MediaService } from '../src/media.js';
@@ -9,6 +9,20 @@ import { runProcess } from '../src/process.js';
 
 const logger = { warn() {} };
 const config = loadConfig({ BOT_TOKEN: '123:fake' });
+test('cookies come from environment and their private temporary file is removed on failure', async () => {
+  const content = '# Netscape HTTP Cookie File\n.example.com\tTRUE\t/\tTRUE\t0\tsession\tsecret-value\n';
+  const service = new MediaService(loadConfig({ BOT_TOKEN: '123:fake', COOKIES_TEXT: content }), logger);
+  let cookiePath;
+  service.ytdlp = async (_link, dir) => {
+    const args = await service.downloadArgs(dir);
+    cookiePath = args[args.indexOf('--cookies') + 1];
+    assert.equal(await readFile(cookiePath, 'utf8'), content);
+    assert.equal((await stat(cookiePath)).mode & 0o777, 0o600);
+    throw new Error('extractor unavailable');
+  };
+  await assert.rejects(service.download({ platform: 'youtube', url: 'https://youtube.com/watch?v=dQw4w9WgXcQ' }, { quality: '720', signal: new AbortController().signal }), /extractor unavailable/);
+  await assert.rejects(access(cookiePath), { code: 'ENOENT' });
+});
 test('yt-dlp uses FFmpeg from PATH by default and accepts an explicit binary path', () => {
   assert.equal(new MediaService(config, logger).commonArgs().includes('--ffmpeg-location'), false);
   const args = new MediaService({ ...config, ffmpeg: '/usr/bin/ffmpeg' }, logger).commonArgs();

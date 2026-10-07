@@ -1,7 +1,14 @@
 services:
   bot:
     build: .
-    env_file: .env
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:?Set BOT_TOKEN in your environment}
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+      COOKIES_TEXT: ${COOKIES_TEXT:-}
+      ALLOWED_USERS: ${ALLOWED_USERS:-}
+      CONCURRENCY: ${CONCURRENCY:-1}
+      PORT: "8000"
     restart: unless-stopped
     init: true
     ports:
