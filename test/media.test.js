@@ -24,6 +24,9 @@ test('cookies come from environment and their private temporary file is removed 
   await assert.rejects(access(cookiePath), { code: 'ENOENT' });
 });
 test('yt-dlp uses FFmpeg from PATH by default and accepts an explicit binary path', () => {
+  const defaults = new MediaService(config, logger).commonArgs();
+  assert(defaults.includes('--verbose'));
+  assert.equal(defaults.includes('--no-warnings'), false);
   assert.equal(new MediaService(config, logger).commonArgs().includes('--ffmpeg-location'), false);
   const args = new MediaService({ ...config, ffmpeg: '/usr/bin/ffmpeg' }, logger).commonArgs();
   assert.equal(args[args.indexOf('--ffmpeg-location') + 1], '/usr/bin/ffmpeg');

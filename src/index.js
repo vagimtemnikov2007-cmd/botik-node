@@ -4,6 +4,8 @@ import pino from 'pino';
 import { loadConfig } from './config.js';
 import { createBot } from './bot.js';
 import { TTLCache } from './state.js';
+import { runProcess } from './process.js';
+import { errorDetails } from './diagnostics.js';
 
 const config = loadConfig();
 const logger = pino({ level: config.logLevel });
@@ -62,6 +64,19 @@ async function shutdown() {
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);
 try {
+  for (const [tool, command, args] of [
+    ['yt-dlp', config.ytdlp, ['--ignore-config', '--version']],
+    ['FFmpeg', config.ffmpeg, ['-version']],
+    ['FFprobe', config.ffprobe, ['-version']],
+  ]) {
+    try {
+      const output = await runProcess(command, args, { timeoutMs: 10000 });
+      logger.info({ tool, version: output.split('\n')[0], nodeVersion: process.version }, 'Media tool available');
+    } catch (error) {
+      logger.error({ tool, details: errorDetails(error, config) }, 'Media tool unavailable');
+      throw error;
+    }
+  }
   await bot.init();
   await bot.api.setMyCommands(commands);
   if (config.webhookUrl) {

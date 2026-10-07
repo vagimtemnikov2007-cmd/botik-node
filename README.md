@@ -4,6 +4,8 @@ Telegram-бот на Node.js 22.9+ (рекомендуется 24 LTS), вдох
 
 ## Запуск на Render
 
+В Logs при запуске выводится `Media tool available` с версиями yt-dlp, FFmpeg и FFprobe. Если инструмент отсутствует, запуск останавливается с `Media tool unavailable`. При `Job failed` поле `details.stderr` содержит предупреждения и отладочный вывод yt-dlp (версии зависимостей, этап запроса, исходную ошибку); `details.stage` показывает `metadata` или `media_download`. Это фактический вывод загрузчика, а не предположение о блокировке сайта. Настроенные секреты и параметры URL скрываются. После изменения кода сделайте push и новый deploy; для обновления yt-dlp в Docker используйте сборку без кеша.
+
 Создайте **Web Service**, подключите репозиторий проекта и выберите **Docker**. Dockerfile устанавливает Node.js, yt-dlp и FFmpeg. В Advanced задайте Health Check Path: `/healthz`.
 
 В **Environment** добавьте:

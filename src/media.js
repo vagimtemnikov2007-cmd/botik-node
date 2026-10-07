@@ -22,7 +22,7 @@ export class MediaService {
   constructor(config, logger) { this.config = config; this.logger = logger; }
   commonArgs(cookiePath = '') {
     const c = this.config;
-    return ['--ignore-config', '--no-warnings', '--no-playlist', '--socket-timeout', '20', '--retries', '2', '--fragment-retries', '2',
+    return ['--ignore-config', '--verbose', '--no-playlist', '--socket-timeout', '20', '--retries', '2', '--fragment-retries', '2',
       ...(c.ffmpeg === 'ffmpeg' ? [] : ['--ffmpeg-location', c.ffmpeg]), '--js-runtimes', 'node', ...(cookiePath ? ['--cookies', cookiePath] : [])];
   }
   async downloadArgs(dir) {
