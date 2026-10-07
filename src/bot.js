@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { extractLinks } from './links.js';
 import { TTLCache, JobQueue } from './state.js';
 import { MediaService } from './media.js';
+import { errorDetails } from './diagnostics.js';
 
 const help = `Отправьте ссылку — я пришлю медиа прямо в чат.
 
@@ -93,6 +94,7 @@ export function createBot(config, logger, service = new MediaService(config, log
     if (queue.size >= config.maxQueue || queue.closed) return ctx.reply('Очередь заполнена. Попробуйте чуть позже.');
     busy.add(owner);
     let status;
+    let context = { stage: 'queue' };
     try {
       status = await ctx.reply('⏳ Добавлено в очередь. Отмена: /cancel', replyOptions(ctx));
       const quality = preferences.get(ctx.from?.id || owner) || config.quality;
@@ -100,19 +102,21 @@ export function createBot(config, logger, service = new MediaService(config, log
         const edit = text => bot.api.editMessageText(ctx.chat.id, status.message_id, text).catch(() => {});
         let completed = 0;
         for (const link of links) {
+          context = { platform: link.platform, url: link.url, stage: 'download' };
           signal.throwIfAborted();
           await edit(`⏬ Загружаю ${link.platform === 'music' ? 'музыку' : link.platform}… (${completed + 1}/${links.length})`);
           const key = `${link.url || link.query}:${audio}:${quality}`;
           const cached = mediaCache.get(key);
           if (cached) {
             // On a stale file_id fail visibly; avoid resending a partially sent album.
-            try { await sendFiles(ctx, cached, link, signal); }
+            try { context.stage = 'telegram_upload'; await sendFiles(ctx, cached, link, signal); }
             catch (error) { mediaCache.delete(key); throw error; }
           } else {
             const result = await service.download(link, { quality, audio, signal });
             try {
               signal.throwIfAborted();
               await edit('📤 Отправляю в Telegram…');
+              context.stage = 'telegram_upload';
               const files = await sendFiles(ctx, result, link, signal);
               mediaCache.set(key, { title: result.title, text: result.text, files });
             } finally { await result.cleanup(); }
@@ -123,7 +127,7 @@ export function createBot(config, logger, service = new MediaService(config, log
       });
       if (config.cooldownMs) cooldowns.set(owner, true);
       promise.catch(error => {
-        logger.warn({ owner, error: publicError(error) }, 'Job failed');
+        logger.warn({ owner, ...context, error: publicError(error), details: errorDetails(error, config) }, 'Job failed');
         return bot.api.editMessageText(ctx.chat.id, status.message_id, `⚠️ ${publicError(error)}`).catch(() => {});
       }).finally(() => busy.delete(owner));
     } catch (error) {

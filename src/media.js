@@ -91,7 +91,11 @@ export class MediaService {
     const c = this.config;
     const downloadArgs = await this.downloadArgs(dir);
     const target = link.platform === 'music' ? `ytsearch1:${link.query}` : link.url;
-    const raw = await runProcess(c.ytdlp, [...downloadArgs, '--dump-single-json', '--skip-download', '--playlist-end', String(c.maxItems), '--', target], { signal, timeoutMs: c.timeoutMs });
+    const runYtdlp = async (args, options, stage) => {
+      try { return await runProcess(c.ytdlp, args, options); }
+      catch (error) { error.stage = stage; throw error; }
+    };
+    const raw = await runYtdlp([...downloadArgs, '--dump-single-json', '--skip-download', '--playlist-end', String(c.maxItems), '--', target], { signal, timeoutMs: c.timeoutMs }, 'metadata');
     const info = JSON.parse(raw);
     const entries = info.entries ? info.entries.filter(Boolean).slice(0, c.maxItems) : [info];
     if (!entries.length) throw new Error('Медиа не найдено.');
@@ -113,9 +117,9 @@ export class MediaService {
       finally { checking = false; }
     }, 1000);
     try {
-      await runProcess(c.ytdlp, [...downloadArgs, '--playlist-end', String(c.maxItems), '--max-filesize', String(c.maxBytes * 3),
+      await runYtdlp([...downloadArgs, '--playlist-end', String(c.maxItems), '--max-filesize', String(c.maxBytes * 3),
         '--match-filter', `!is_live & duration <=? ${c.maxDuration}`, '--write-info-json', '-o', join(dir, '%(autonumber)03d-%(id)s.%(ext)s'),
-        ...format, '--', target], { signal: AbortSignal.any([signal, diskController.signal]), timeoutMs: c.timeoutMs });
+        ...format, '--', target], { signal: AbortSignal.any([signal, diskController.signal]), timeoutMs: c.timeoutMs }, 'media_download');
     } finally { clearInterval(diskTimer); }
     const names = (await readdir(dir)).sort();
     const files = names.filter(name => /\.(mp4|mp3|m4a|webm|mkv|mov)$/i.test(name)).slice(0, c.maxItems).map(name => ({

@@ -20,7 +20,11 @@ export function runProcess(command, args, { signal, timeoutMs = 300000, maxOutpu
     child.on('close', code => {
       cleanup();
       if (failure) reject(failure);
-      else if (code !== 0) reject(new Error(`Загрузчик завершился с кодом ${code}: ${stderr.slice(-2000)}`));
+      else if (code !== 0) {
+        const error = new Error(`Загрузчик завершился с кодом ${code}: ${stderr.slice(-2000)}`);
+        Object.assign(error, { command, exitCode: code, stderr });
+        reject(error);
+      }
       else resolve(stdout);
     });
   });
