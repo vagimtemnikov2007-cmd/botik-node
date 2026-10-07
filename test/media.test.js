@@ -9,6 +9,32 @@ import { runProcess } from '../src/process.js';
 
 const logger = { warn() {} };
 const config = loadConfig({ BOT_TOKEN: '123:fake' });
+test('unsupported TikTok photo URLs use the album adapter and clean up after sending', async () => {
+  const service = new MediaService(config, logger);
+  let albumDir;
+  service.ytdlp = async () => {
+    throw Object.assign(new Error('unsupported'), { stderr: 'ERROR: Unsupported URL: https://www.tiktok.com/@user/photo/123' });
+  };
+  service.tiktokPhotos = async (_link, dir) => {
+    albumDir = dir;
+    const files = [];
+    for (let i = 0; i < 2; i++) {
+      const path = join(dir, `${i}.jpg`); await writeFile(path, 'mock image');
+      files.push({ path, type: 'photo' });
+    }
+    return { title: 'Album', files };
+  };
+  const result = await service.download({ platform: 'tiktok', url: 'https://vt.tiktok.com/example/' }, { quality: '720', signal: new AbortController().signal });
+  assert.equal(result.files.length, 2);
+  await result.cleanup();
+  await assert.rejects(access(albumDir), { code: 'ENOENT' });
+});
+test('TikTok video errors retain the original failure instead of trying the photo adapter', async () => {
+  const service = new MediaService(config, logger);
+  service.ytdlp = async () => { throw new Error('HTTP Error 403'); };
+  service.tiktokPhotos = async () => { assert.fail('photo fallback must not run'); };
+  await assert.rejects(service.download({ platform: 'tiktok', url: 'https://vt.tiktok.com/example/' }, { quality: '720', signal: new AbortController().signal }), /HTTP Error 403/);
+});
 test('cookies come from environment and their private temporary file is removed on failure', async () => {
   const content = '# Netscape HTTP Cookie File\n.example.com\tTRUE\t/\tTRUE\t0\tsession\tsecret-value\n';
   const service = new MediaService(loadConfig({ BOT_TOKEN: '123:fake', COOKIES_TEXT: content }), logger);

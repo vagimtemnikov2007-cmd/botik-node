@@ -1,6 +1,7 @@
 import { mkdtemp, readdir, readFile, writeFile, stat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { runProcess } from './process.js';
 import { downloadFile, fetchText } from './network.js';
 
@@ -45,8 +46,13 @@ export class MediaService {
         try { result = await this.ytdlp(link, dir, quality, audio, jobSignal); }
         catch (error) {
           jobSignal.throwIfAborted();
-          if (link.platform !== 'pinterest' || audio) throw error;
-          result = await this.pinterestPhoto(link, dir, jobSignal);
+          if (link.platform === 'tiktok' && /Unsupported URL:.*\/photo\/\d+/i.test(error.stderr || error.message)) {
+            if (audio) throw new Error('Для фотоальбомов TikTok скачивание аудио пока не поддерживается.');
+            result = await this.tiktokPhotos(link, dir, jobSignal);
+          } else {
+            if (link.platform !== 'pinterest' || audio) throw error;
+            result = await this.pinterestPhoto(link, dir, jobSignal);
+          }
         }
       }
       for (const file of result.files) {
@@ -76,6 +82,26 @@ export class MediaService {
       files.push({ path, type: item.type });
     }
     return { title: tweet.author?.name || 'X / Twitter', text: tweet.text || '', files };
+  }
+  async tiktokPhotos(link, dir, signal) {
+    // The failed yt-dlp attempt has already created the private cookie file.
+    const cookiePath = this.config.cookiesText ? join(dir, 'cookies.txt') : '';
+    let info;
+    try {
+      info = JSON.parse(await runProcess('python', [fileURLToPath(new URL('./tiktok_photos.py', import.meta.url)), link.url, cookiePath], { signal, timeoutMs: this.config.timeoutMs }));
+    } catch (error) { error.stage = 'tiktok_photo_metadata'; throw error; }
+    const files = [];
+    for (const [index, url] of info.images.slice(0, this.config.maxItems).entries()) {
+      const path = join(dir, `tiktok-photo-${index}.jpg`);
+      try {
+        const type = await downloadFile(url, path, this.config.maxBytes, {
+          domains: ['tiktokcdn.com', 'tiktokcdn-us.com', 'tiktokcdn-eu.com', 'tiktok.com', 'ibytedtos.com', 'byteoversea.com'], signal,
+        });
+        if (!type.startsWith('image/')) throw new Error('TikTok вернул неверный формат изображения.');
+      } catch (error) { error.stage = 'tiktok_photo_download'; throw error; }
+      files.push({ path, type: 'photo' });
+    }
+    return { title: info.title, files };
   }
   async pinterestPhoto(link, dir, signal) {
     const html = await fetchText(link.url, { domains: ['pin.it', 'pinterest.com', 'pinterest.ru'], signal });
