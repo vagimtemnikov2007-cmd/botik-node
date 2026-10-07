@@ -1,10 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createBot } from '../src/bot.js';
+import { createBot, publicError } from '../src/bot.js';
 import { loadConfig } from '../src/config.js';
 
 const logger = { warn() {}, error() {}, info() {} };
+test('TikTok extraction error is not classified as login because cookies occur in the traceback', () => {
+  const error = Object.assign(new Error('_solve_challenge_and_set_cookies'), {
+    stderr: 'WARNING: no impersonate target is available\nERROR: [TikTok] Unexpected response from webpage request\n cookie_names = self._solve_challenge_and_set_cookies(webpage)',
+  });
+  assert.match(publicError(error), /TikTok вернул ответ/);
+  assert.doesNotMatch(publicError(error), /авторизации/);
+  assert.match(publicError(Object.assign(new Error('failed'), { stderr: 'ERROR: HTTP Error 403: Forbidden' })), /ограничил доступ/);
+});
 function harness(service, extra = {}) {
   const config = loadConfig({ BOT_TOKEN: '123:fake', USER_COOLDOWN_SECONDS: '0', ...extra });
   const { bot, queue } = createBot(config, logger, service);
