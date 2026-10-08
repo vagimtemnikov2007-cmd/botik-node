@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runProcess } from './process.js';
 import { downloadFile, fetchText } from './network.js';
+import { youtubeMetadata } from './youtube.js';
 
 export function twitterMedia(tweet, maxItems) {
   const all = tweet.media?.all || [...(tweet.media?.photos || []), ...(tweet.media?.videos || [])];
@@ -121,8 +122,19 @@ export class MediaService {
       try { return await runProcess(c.ytdlp, args, options); }
       catch (error) { error.stage = stage; throw error; }
     };
-    const raw = await runYtdlp([...downloadArgs, '--dump-single-json', '--skip-download', '--playlist-end', String(c.maxItems), '--', target], { signal, timeoutMs: c.timeoutMs }, 'metadata');
-    const info = JSON.parse(raw);
+    let info;
+    if (link.platform === 'youtube' && c.youtubeApiKey) {
+      try {
+        info = await youtubeMetadata(link.id || new URL(link.url).searchParams.get('v'), c.youtubeApiKey, signal);
+      } catch {
+        signal.throwIfAborted();
+        this.logger.warn({ platform: 'youtube', stage: 'youtube_api_metadata' }, 'YouTube Data API unavailable, trying yt-dlp metadata');
+      }
+    }
+    if (!info) {
+      const raw = await runYtdlp([...downloadArgs, '--dump-single-json', '--skip-download', '--playlist-end', String(c.maxItems), '--', target], { signal, timeoutMs: c.timeoutMs }, 'metadata');
+      info = JSON.parse(raw);
+    }
     const entries = info.entries ? info.entries.filter(Boolean).slice(0, c.maxItems) : [info];
     if (!entries.length) throw new Error('Медиа не найдено.');
     if (entries.some(e => e.is_live || e.live_status === 'is_live' || Number(e.duration) > c.maxDuration)) throw new Error(`Трансляции и видео длиннее ${Math.floor(c.maxDuration / 60)} минут не поддерживаются.`);

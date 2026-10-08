@@ -22,6 +22,18 @@ Telegram-бот на Node.js 22.9+ (рекомендуется 24 LTS), вдох
 
 Бот временно сохраняет медиа в системной папке временных файлов, чтобы yt-dlp и FFmpeg могли скачать/обработать файл, а Telegram — получить его. После отправки, отмены или ошибки папка задачи удаляется. Очередь, кеш Telegram file_id и настройки качества находятся в памяти; перезапуск сбрасывает их. Это версия для одного экземпляра.
 
+## Google Cloud: YouTube Data API v3
+
+При наличии `YOUTUBE_API_KEY` название, длительность и статус трансляции YouTube-ссылок запрашиваются через Google API. При ошибке API бот возвращается к yt-dlp. Видео и MP3 скачивает yt-dlp: Data API не предоставляет метод скачивания видеофайлов и не устраняет блокировки загрузчика. `/music` пока использует поиск yt-dlp.
+
+1. [Создайте проект](https://console.cloud.google.com/projectcreate) или выберите существующий.
+2. [Включите YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com).
+3. [Создайте API key](https://console.cloud.google.com/apis/credentials). В API restrictions выберите Restrict key → YouTube Data API v3. Для серверного Node.js не используйте HTTP referrers; ограничение IP подходит при постоянном исходящем IP сервера.
+4. Добавьте `YOUTUBE_API_KEY` в Environment Render или локальный `.env`. Для публичных метаданных OAuth и service account не нужны.
+5. Перезапустите сервис. Локально с `.env`: `node --env-file=.env src/index.js`. Docker Compose передаёт ключ из `.env` автоматически.
+
+Вызов `videos.list` стоит 1 единицу квоты: [документация](https://developers.google.com/youtube/v3/docs/videos/list), [квоты проекта](https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas).
+
 ## Возможности
 
 Фотоальбомы TikTok обрабатываются отдельным адаптером через Python-библиотеку yt-dlp: короткие ссылки раскрываются, фотографии скачиваются с CDN TikTok и отправляются в Telegram (до `MAX_ITEMS`). Изображения удаляются после отправки или ошибки. `/audio` для фотоальбомов пока не поддерживается. Адаптер использует обработку запросов и проверок TikTok из yt-dlp; ограничения доступа со стороны TikTok всё ещё возможны.

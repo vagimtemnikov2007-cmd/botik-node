@@ -1,5 +1,5 @@
 export function errorDetails(error, config = {}) {
-  const secrets = [config.token, config.webhookSecret,
+  const secrets = [config.token, config.webhookSecret, config.youtubeApiKey,
     ...(config.cookiesText || '').split('\n').filter(line => line && (!line.startsWith('#') || line.startsWith('#HttpOnly_'))).map(line => line.split('\t')[6]),
   ].filter(Boolean);
   const clean = value => {

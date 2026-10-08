@@ -28,6 +28,7 @@ export function loadConfig(env = process.env) {
     timeoutMs: number('JOB_TIMEOUT_SECONDS', 300, 10, 1800) * 1000,
     maxLinks: number('MAX_LINKS', 3, 1, 10), maxItems: number('MAX_ITEMS', 10, 1, 20),
     ytdlp: 'yt-dlp', ffmpeg: 'ffmpeg', ffprobe: 'ffprobe',
+    youtubeApiKey: (env.YOUTUBE_API_KEY || '').trim(),
     cookiesText, logLevel: env.LOG_LEVEL || 'info',
   };
 }
