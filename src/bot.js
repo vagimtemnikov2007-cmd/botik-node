@@ -21,12 +21,12 @@ const help = `Отправьте ссылку — я пришлю медиа п�
 export function publicError(error) {
   if (error.name === 'AbortError') return 'Загрузка отменена.';
   // Match actual error lines, not debug output or Python function names.
-  const stderrErrors = String(error.stderr || '').split('\n').filter(line => /^ERROR:/i.test(line));
+  const stderrErrors = String(error.stderr || '').split('\n').filter(line => /^(?:ERROR|WARNING):/i.test(line));
   const text = stderrErrors.length ? stderrErrors.join('\n') : String(error.message || '');
   if (/ENOENT/.test(text)) return 'На сервере не установлен yt-dlp или FFmpeg. Сообщите владельцу бота.';
   if (/Unexpected response from webpage request/i.test(text)) return 'TikTok вернул ответ, который загрузчик не смог обработать. Подробности записаны в лог сервера.';
-  if (/sign in|login|cookies|confirm.*bot|private|403|401/i.test(text)) return 'Сайт требует авторизации или ограничил доступ. Попробуйте позже; владельцу бота может понадобиться cookies.txt.';
   if (/429/.test(text)) return 'Сервис ограничил частоту запросов. Попробуйте позже.';
+  if (/sign in|login|cookies|confirm.*bot|private|403|401/i.test(text)) return 'Сайт требует авторизации или ограничил доступ. Попробуйте позже; владельцу бота может понадобиться cookies.txt.';
   if (/Загрузчик|HTTP|JSON|Unexpected|fetch|ECONN|ENOTFOUND|certificate/i.test(text)) return 'Не удалось получить медиа. Проверьте ссылку и доступность публикации.';
   return /[а-яё]/i.test(text) ? text.slice(0, 350) : 'Не удалось обработать ссылку. Попробуйте позже.';
 }

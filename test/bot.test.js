@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createBot, publicError } from '../src/bot.js';
+
+test('rate limits in warnings take precedence over player extraction errors', () => {
+  const error = Object.assign(new Error('failed'), {
+    stderr: '[debug] cookies: 403\nWARNING: [youtube] Unable to download webpage: HTTP Error 429: Too Many Requests\nWARNING: [youtube] Unable to download API page: HTTP Error 403: Forbidden\nERROR: [youtube] Failed to extract any player response',
+  });
+  assert.match(publicError(error), /частоту запросов/);
+});
 import { loadConfig } from '../src/config.js';
 
 const logger = { warn() {}, error() {}, info() {} };
